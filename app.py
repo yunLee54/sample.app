@@ -4,12 +4,14 @@
 준비:  Voca_3000.csv 를 app.py 와 같은 폴더에 두세요.
 """
 import html
+import json
 import random
 import re
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 DATA_FILE = Path(__file__).parent / "Voca_3000.csv"
 
@@ -246,6 +248,55 @@ def render_card(text, sub=""):
     )
 
 
+SPEAK_HTML = """
+<meta name="color-scheme" content="light dark">
+<style>
+  body { margin: 0; font-family: sans-serif; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  button {
+    cursor: pointer; font-size: 15px; padding: 7px 14px; border-radius: 8px;
+    border: 1px solid rgba(128,128,128,.5); background: rgba(128,128,128,.15); color: CanvasText;
+  }
+  button:active { background: rgba(128,128,128,.35); }
+  #m { font-size: 13px; opacity: .75; }
+</style>
+<div class="row">
+  <button id="normal">🔊 발음 듣기</button>
+  <button id="slow">🐢 천천히</button>
+  <span id="m"></span>
+</div>
+<script>
+  const word = __WORD__;
+  const msg = document.getElementById('m');
+  function pickVoice() {
+    const voices = window.speechSynthesis.getVoices();
+    return voices.find(v => v.lang === 'en-US') ||
+           voices.find(v => v.lang && v.lang.startsWith('en')) || null;
+  }
+  function say(rate) {
+    if (!('speechSynthesis' in window)) {
+      msg.textContent = '이 브라우저는 음성 재생을 지원하지 않아요.';
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(word);
+    u.lang = 'en-US';
+    u.rate = rate;
+    const v = pickVoice();
+    if (v) u.voice = v;
+    window.speechSynthesis.speak(u);
+  }
+  document.getElementById('normal').onclick = () => say(0.9);
+  document.getElementById('slow').onclick = () => say(0.55);
+</script>
+"""
+
+
+def speak_button(text):
+    """브라우저 내장 음성 합성(Web Speech API)으로 영어 발음을 들려줌 (추가 설치 없음)"""
+    components.html(SPEAK_HTML.replace("__WORD__", json.dumps(text)), height=52)
+
+
 def fc_unflip(flip_key):
     st.session_state[flip_key] = False
 
@@ -320,6 +371,7 @@ def mode_flashcards(name, lvdf):
         render_card(row["Meaning"], sub)
     else:
         render_card(row["Word"], "카드를 뒤집어 뜻을 확인하세요")
+    speak_button(row["Word"])
 
     b1, b2, b3 = st.columns(3)
     b1.button("◀ 이전", key=f"fc_prev_{name}", disabled=pos <= 1, on_click=fc_move,
